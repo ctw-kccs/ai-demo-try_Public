@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>宋帝南逃香港路線圖</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    
+    <!-- Google Fonts (Noto Serif TC for historical feel) -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Noto Serif TC', serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f1ea; /* Parchment-like background */
+            color: #3e2723;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        header {
+            background-color: #5d4037;
+            color: #fff;
+            padding: 10px 20px;
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            z-index: 1000;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            letter-spacing: 2px;
+        }
+
+        #map-container {
+            flex: 1;
+            position: relative;
+            z-index: 1;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+
+        #controls {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-top: 1px solid #8d6e63;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+        }
+
+        #info-panel {
+            width: 90%;
+            max-width: 600px;
+            text-align: center;
+            margin-bottom: 10px;
+            min-height: 80px;
+        }
+
+        #location-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #bf360c;
+            margin-bottom: 5px;
+        }
+
+        #location-desc {
+            font-size: 0.95rem;
+            line-height: 1.4;
+        }
+
+        #timeline-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        button {
+            background-color: #8d6e63;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            font-family: 'Noto Serif TC', serif;
+            font-size: 1rem;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background-color: #5d4037;
+        }
+
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        #progress-bar {
+            width: 100%;
+            max-width: 600px;
+            height: 6px;
+            background: #e0e0e0;
+            margin-top: 10px;
+            border-radius: 3px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        #progress-fill {
+            height: 100%;
+            background: #bf360c;
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
+        /* Custom Marker Styles */
+        .custom-icon {
+            text-align: center;
+            color: #bf360c;
+            font-weight: bold;
+            text-shadow: 1px 1px 0 #fff;
+        }
+        
+        /* Popup Styling */
+        .leaflet-popup-content-wrapper {
+            border-radius: 4px;
+            font-family: 'Noto Serif TC', serif;
+        }
+        .leaflet-popup-content h3 {
+            margin: 5px 0;
+            color: #5d4037;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>宋帝南逃香港路線互動圖</h1>
+</header>
+
+<div id="map-container">
+    <div id="map"></div>
+</div>
+
+<div id="controls">
+    <div id="info-panel">
+        <div id="location-title">準備開始</div>
+        <div id="location-desc">點擊「開始旅程」以追蹤宋端宗趙昰及宋帝昺南逃至香港的歷史足跡。</div>
+    </div>
+    
+    <div id="timeline-controls">
+        <button id="prev-btn" onclick="prevStep()" disabled>上一步</button>
+        <button id="next-btn" onclick="nextStep()">開始旅程</button>
+        <button id="reset-btn" onclick="resetMap()">重置</button>
+    </div>
+    
+    <div id="progress-bar">
+        <div id="progress-fill"></div>
+    </div>
+</div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+<script>
+    // Map Data: Historical locations of the Song Emperor's flight
+    const journeyData = [
+        {
+            id: 0,
+            name: "福建福州 (Fuzhou)",
+            coords: [26.0745, 119.2965],
+            year: "1276年 5月",
+            desc: "【起點】南宋都城臨安淪陷後，益王趙昰在福州登基，是為宋端宗。改元景炎，展開流亡生涯。",
+            zoom: 7
+        },
+        {
+            id: 1,
+            name: "福建泉州 (Quanzhou)",
+            coords: [24.8741, 118.6757],
+            year: "1276年 11月",
+            desc: "【拒之門外】宋軍抵達泉州，但守將蒲壽庚拒絕宋帝入城。宋軍被迫搶船出海，繼續南逃。",
+            zoom: 8
+        },
+        {
+            id: 2,
+            name: "廣東潮州 (Chaozhou)",
+            coords: [23.6569, 116.6235],
+            year: "1277年 初",
+            desc: "【暫泊廣東】宋帝一行經海路抵達潮州及惠州甲子門一帶，元軍緊隨其後。",
+            zoom: 8
+        },
+        {
+            id: 3,
+            name: "香港 梅蔚 (Mui Wo/Lantau)",
+            coords: [22.2648, 113.9961],
+            year: "1277年 4月",
+            desc: "【初抵香港】宋端宗經海路抵達「梅蔚」（今大嶼山梅窩一帶）。傳說宋帝曾在此駐紮。",
+            zoom: 11
+        },
+        {
+            id: 4,
+            name: "九龍 官富場 (Kowloon City)",
+            coords: [22.3242, 114.1896],
+            year: "1277年 4月 - 9月",
+            desc: "【宋皇臺】宋帝隨後移師九龍「官富場」（今九龍城）。相傳趙昰與趙昺常在海邊巨石休息，後人刻石「宋王臺」紀念。",
+            zoom: 13
+        },
+        {
+            id: 5,
+            name: "荃灣 淺灣 (Tsuen Wan)",
+            coords: [22.3699, 114.1144],
+            year: "1277年 9月",
+            desc: "【轉戰荃灣】為躲避元軍，宋軍轉移至「淺灣」（今荃灣）。但元將劉深隨後襲擊，宋軍戰敗。",
+            zoom: 12
+        },
+        {
+            id: 6,
+            name: "大嶼山 (Lantau Island)",
+            coords: [22.25, 113.93], // General Lantau area
+            year: "1278年",
+            desc: "【端宗駕崩】宋軍逃往東莞虎門後折返大嶼山（一說碙州）。宋端宗在此病逝，弟趙昺繼位。",
+            zoom: 11
+        },
+        {
+            id: 7,
+            name: "新會 崖門 (Yamen)",
+            coords: [22.1833, 113.0667],
+            year: "1279年",
+            desc: "【最後一戰】宋軍退守新會崖門。1279年爆發崖山海戰，宋軍全軍覆沒，陸秀夫背少帝趙昺投海殉國，南宋滅亡。",
+            zoom: 9
+        }
+    ];
+
+    // Initialize Map
+    const map = L.map('map').setView([24.5, 116.0], 6);
+
+    // Add specific tile layer (using CartoDB Voyager for a clean look, or OSM)
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+        subdomains: 'abcd',
+        maxZoom: 19
+    }).addTo(map);
+
+    // State
+    let currentStep = -1;
+    let polylines = [];
+    let markers = [];
+
+    // Custom Icons
+    const crownIcon = L.divIcon({
+        html: '<div style="font-size: 24px;">👑</div>',
+        className: 'custom-icon',
+        iconSize: [30, 30],
+        iconAnchor: [15, 15]
+    });
+
+    const dotIcon = L.divIcon({
+        html: '<div style="width: 12px; height: 12px; background: #bf360c; border-radius: 50%; border: 2px solid white;"></div>',
+        className: 'custom-icon',
+        iconSize: [16, 16],
+        iconAnchor: [8, 8]
+    });
+
+    const battleIcon = L.divIcon({
+        html: '<div style="font-size: 24px;">⚔️</div>',
+        className: 'custom-icon',
+        iconSize: [30, 30],
+        iconAnchor: [15, 15]
+    });
+
+    // Helper to add marker
+    function addLocationMarker(stepIndex) {
+        const data = journeyData[stepIndex];
+        let icon = dotIcon;
+        if (stepIndex === 0) icon = crownIcon;
+        if (stepIndex === 4) icon = crownIcon; // Sung Wong Toi
+        if (stepIndex === journeyData.length - 1) icon = battleIcon;
+
+        const marker = L.marker(data.coords, { icon: icon }).addTo(map);
+        marker.bindPopup(`<h3>${data.name}</h3><p><b>${data.year}</b></p><p>${data.desc}</p>`).openPopup();
+        markers.push(marker);
+        return marker;
+    }
+
+    // Helper to draw line
+    function drawLine(fromIndex, toIndex) {
+        const from = journeyData[fromIndex].coords;
+        const to = journeyData[toIndex].coords;
+        
+        const polyline = L.polyline([from, to], {
+            color: '#bf360c',
+            weight: 4,
+            opacity: 0.8,
+            dashArray: '5, 10', // Dashed line implies travel
+            lineCap: 'round'
+        }).addTo(map);
+        
+        polylines.push(polyline);
+    }
+
+    function updateUI(index) {
+        const data = journeyData[index];
+        document.getElementById('location-title').innerText = `${data.year} - ${data.name}`;
+        document.getElementById('location-desc').innerText = data.desc;
+        
+        // Update progress bar
+        const percent = ((index + 1) / journeyData.length) * 100;
+        document.getElementById('progress-fill').style.width = `${percent}%`;
+
+        // Update Buttons
+        document.getElementById('prev-btn').disabled = (index <= 0);
+        document.getElementById('next-btn').innerText = (index >= journeyData.length - 1) ? "旅程結束" : "下一步";
+        document.getElementById('next-btn').disabled = (index >= journeyData.length - 1);
+    }
+
+    function nextStep() {
+        if (currentStep < journeyData.length - 1) {
+            currentStep++;
+            
+            // Draw line from previous if not first
+            if (currentStep > 0) {
+                drawLine(currentStep - 1, currentStep);
+            }
+
+            // Add marker
+            const marker = addLocationMarker(currentStep);
+            
+            // Move map
+            map.flyTo(journeyData[currentStep].coords, journeyData[currentStep].zoom, {
+                duration: 1.5
+            });
+
+            updateUI(currentStep);
+        }
+    }
+
+    function prevStep() {
+        if (currentStep > 0) {
+            // Remove current marker
+            const markerToRemove = markers.pop();
+            map.removeLayer(markerToRemove);
+
+            // Remove line to current
+            const lineToRemove = polylines.pop();
+            map.removeLayer(lineToRemove);
+
+            currentStep--;
+            
+            // Move map back
+            map.flyTo(journeyData[currentStep].coords, journeyData[currentStep].zoom, {
+                duration: 1.5
+            });
+
+            updateUI(currentStep);
+        }
+    }
+
+    function resetMap() {
+        // Clear all layers
+        markers.forEach(m => map.removeLayer(m));
+        polylines.forEach(p => map.removeLayer(p));
+        markers = [];
+        polylines = [];
+        currentStep = -1;
+        
+        // Reset UI
+        document.getElementById('location-title').innerText = "準備開始";
+        document.getElementById('location-desc').innerText = "點擊「開始旅程」以追蹤宋端宗趙昰及宋帝昺南逃至香港的歷史足跡。";
+        document.getElementById('progress-fill').style.width = "0%";
+        document.getElementById('prev-btn').disabled = true;
+        document.getElementById('next-btn').innerText = "開始旅程";
+        document.getElementById('next-btn').disabled = false;
+        
+        map.setView([24.5, 116.0], 6);
+    }
+
+</script>
+
+</body>
+</html>
